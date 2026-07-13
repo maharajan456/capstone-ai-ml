@@ -54,7 +54,7 @@ Typical features include:
 
 
 
-# Why this dataset is perfect for your capstone
+# Why this dataset is perfect for my capstone
 
 My assignment has four independent parts. This dataset naturally supports each one.
 
