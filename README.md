@@ -254,5 +254,7 @@ LLM Explanation
 Part 4
 AI Financial Advisor
 (Personalized recommendations + production guardrails)
-```
 
+```
+Dataset Source : Kaggle
+Dataset URL : https://www.kaggle.com/datasets/laotse/credit-risk-dataset
