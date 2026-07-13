@@ -4,6 +4,18 @@ Track Chosen
 
 Track C – Model Prediction Explanation Pipeline
 
+Part 4 — Selected Feature Track
+
+For Part 4, I selected Track C: Model Prediction Explanation Pipeline.
+
+The best-performing machine-learning Pipeline from Part 3 is loaded from best_model.pkl and used to generate loan-risk predictions for three hand-crafted applicant feature inputs. The predicted class and probability, together with the applicant's feature values, are passed to an LLM API.
+
+The LLM generates a structured JSON explanation containing the prediction label, confidence level, primary reason, secondary reason, and recommended next step. Each LLM response is parsed and validated against a predefined JSON schema.
+
+A PII guardrail is applied before every LLM API call to prevent inputs containing email addresses or phone numbers from being transmitted to the external LLM service.
+
+This track was selected because it directly integrates the trained credit-risk model with an LLM-powered explanation layer, aligning with the project's objective of developing a Loan Risk Prediction and Financial Advisor system.
+
 Overview
 
 This part extends the machine learning pipeline developed in Parts 2 and
@@ -91,6 +103,66 @@ All three prediction examples successfully passed schema validation.
   Record 2   0                 0.290         PASS
   Record 3   1                 0.790         PASS
 
+
+
+Loading the Trained Model
+
+The best-performing machine learning pipeline developed in Part 3 was loaded using `joblib.load('best_model.pkl')`. The loaded model expects 17 encoded input features, consisting of numerical variables together with one-hot encoded categorical variables. Before prediction, every applicant record is transformed into the same feature representation used during model training through the `encode_record()` function.
+
+For each applicant record, the pipeline performs the following sequence:
+
+1. Encode the raw feature values into the trained feature space.
+2. Predict the loan default class using `predict()`.
+3. Predict the probability of default using `predict_proba()`.
+4. Construct a structured prompt containing the applicant features, predicted class, and prediction probability.
+5. Send the prompt to the LLM for explanation generation.
+
+---
+
+JSON Schema Validation
+
+A JSON schema was defined using the `jsonschema` library to guarantee that every explanation returned by the LLM follows a consistent structure. The schema requires the following five scalar fields:
+
+* `prediction_label`
+* `confidence_level`
+* `top_reason`
+* `second_reason`
+* `next_step`
+
+After each API call, the returned text is stripped of whitespace using `response.strip()` and parsed using `json.loads()`. The parsed object is then validated using `jsonschema.validate()`.
+
+Two levels of exception handling are implemented:
+
+* `json.JSONDecodeError` handles malformed or invalid JSON responses.
+* `jsonschema.ValidationError` handles responses that do not satisfy the required schema.
+
+If either exception occurs, the pipeline returns a fallback dictionary in which all required fields are assigned `null`. This prevents invalid LLM responses from propagating into the application.
+
+---
+
+Validation Results
+
+Three different applicant records were processed through the complete prediction and explanation pipeline.
+
+| Feature Input | Predicted Class | Probability | Explanation JSON                               | Validation Status |
+| ------------- | --------------- | ----------- | ---------------------------------------------- | ----------------- |
+| Applicant 1   | 0 (Low Risk)    | 0.0650      | Valid JSON containing all five required fields | PASS              |
+| Applicant 2   | 0 (Low Risk)    | 0.2900      | Valid JSON containing all five required fields | PASS              |
+| Applicant 3   | 1 (High Risk)   | 0.7900      | Valid JSON containing all five required fields | PASS              |
+
+All three responses were successfully parsed as valid JSON and satisfied the predefined schema without any validation errors.
+
+---
+
+Interpretation
+
+The results demonstrate that the complete prediction explanation pipeline functions reliably. The machine learning model first generated a prediction and probability for each applicant, after which the LLM produced a structured explanation that accurately reflected the model output.
+
+The low-risk applicants (Applicants 1 and 2) received explanations highlighting positive financial indicators such as higher income, lower loan burden, or longer credit history. The high-risk applicant (Applicant 3) received an explanation identifying important risk factors including a high loan-to-income ratio, shorter employment history, and previous credit default.
+
+Because every response passed schema validation successfully, the pipeline proved capable of generating deterministic, machine-readable explanations suitable for downstream processing. The use of schema validation and fallback handling also improves the robustness of the application by preventing malformed LLM outputs from affecting later stages of the workflow.
+
+
 Task 4 – Guardrails
 
 Implemented regex-based PII detection before every LLM call.
@@ -129,6 +201,26 @@ The application allows users to: - Enter loan applicant details -
 Predict default risk - View prediction probability - Generate LLM
 explanation - Validate JSON output - Download explanation -
 Automatically block PII
+
+End-to-End Demonstration
+
+The complete prediction explanation pipeline was executed using three manually created loan application records. For each record, the following workflow was performed:
+
+1. The applicant's feature values were encoded using the same preprocessing pipeline employed during model training.
+2. The trained Random Forest model generated a prediction (`predict()`) and a probability score (`predict_proba()`).
+3. A PII guardrail inspected the prompt using regular expressions. Since none of the inputs contained email addresses or phone numbers, all three requests passed the guardrail and were forwarded to the LLM.
+4. The LLM generated a structured JSON explanation describing the prediction.
+5. The JSON response was validated against the predefined schema using `jsonschema.validate()`. All three responses successfully passed schema validation.
+
+End-to-End Results
+
+| Input                                                                     | LLM Output                                                                                           | Valid JSON | Pass/Block |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------- | ---------- |
+| Applicant 1 (High income, Grade A, Low loan percentage)                   | Loan approved with low default risk; stable employment and low loan burden identified as key reasons |  Pass     |  Pass     |
+| Applicant 2 (Moderate income, Grade C, Medical loan)                      | Loan approved with moderate confidence; acceptable credit history and manageable risk identified     |  Pass     |  Pass     |
+| Applicant 3 (Low income, Grade E, Previous default, High loan percentage) | High default risk predicted; large loan burden and previous default highlighted as major factors     |  Pass     |  Pass     |
+
+
 
 Conclusion
 
